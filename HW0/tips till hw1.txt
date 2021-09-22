@@ -1,0 +1,16 @@
+set term postscript eps enhanced color
+set output "results1.eps"
+set title "Requests handled per second"
+set xlabel "Amount requests"
+set ylabel "Time"
+set xrange [0:1500]
+set yrange [0:1000000]
+
+plot "experiment.dat" using 1:2 with linespoints title "Experiment"
+
+
+http parse - read legnth in header
+keep acigve sockets
+respond with various https status
+
+send_file and readfile
