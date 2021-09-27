@@ -17,25 +17,27 @@ init(Name) ->
     router(Name, 0, Hist, Intf, Table, Map).
 
 router(Name, N, Hist, Intf, Table, Map) ->
+    % io:format("~w: running router again~n", [Name]),
     receive
         {links, Node, R, Links} ->
             io:format("~w: link received ~w, ~w, ~w~n", [Name, Node, R, Links]),
             case hist:update(Node, R, Hist) of
                 {new, Hist1} ->
-                    io:format("~w: new link!~n", [Name]),
+                    % io:format("~w: new link!~n", [Name]),
                     intf:broadcast({links, Node, R, Links}, Intf),
                     Map1 = map:update(Node, Links, Map),
-                    %% borde uppdatera routing table med dijkstra
-                    router(Name, N, Hist1, Intf, Table, Map1);
+                    %% auto-update routing table with dijkstra
+                        %% Table1 = dijkstra:table(intf:list(Intf), Map1), let Table -> Table1
+                    router(Name, N, Hist1, Intf, Table, Map1); 
                 old ->
-                    io:format("~w: old link~n", [Name]),
+                    % io:format("~w: old link~n", [Name]),
                     router(Name, N, Hist, Intf, Table, Map)
             end;
         {route, Name, From, Message} ->
-            io:format("~w: received message from ~w, ~w ~n", [Name, From, Message]),
+            io:format("~w: received message from ~w, ~s ~n", [Name, From, Message]),
             router(Name, N, Hist, Intf, Table, Map);
         {route, To, From, Message} ->
-            io:format("~w: routing message (~w)", [Name, Message]),
+            io:format("~w: routing message (~s)~n", [Name, Message]),
             case dijkstra:route(To, Table) of
                 {ok, Gw} ->
                     case intf:lookup(Gw, Intf) of
@@ -54,7 +56,9 @@ router(Name, N, Hist, Intf, Table, Map) ->
         {add, Node, Pid} ->
             Ref = erlang:monitor(process,Pid),
             Intf1 = intf:add(Node, Ref, Pid, Intf),
-            %% boradcast varje gång en länk addas 
+            %% auto-broadcast every time a link is added
+                %% Message = {links, Name, N, intf:list(Intf1)},
+                %% intf:broadcast(Message, Intf1),
             router(Name, N, Hist, Intf1, Table, Map);
         {remove, Node} ->
             {ok, Ref} = intf:ref(Node, Intf),
