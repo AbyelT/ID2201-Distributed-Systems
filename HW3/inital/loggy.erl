@@ -1,4 +1,4 @@
--module(logger).
+-module(loggy).
 
 -export([start/1, stop/1]).
 
@@ -8,7 +8,7 @@ start(Nodes) ->
 stop(Logger) ->
     Logger ! stop.
 
-init(_) ->
+init(Nodes) ->
     loop().
 
 loop() ->
