@@ -1,5 +1,5 @@
 -module(node1).
--define(Stabilize, 1000).
+-define(Stabilize, 5000).
 -define(Timeout, 10000).
 
 -export([start/1, start/2, status/1]).
@@ -18,7 +18,7 @@ init(Id, Peer) ->
     Predecessor = nil,
     {ok, Successor} = connect(Id, Peer),
     schedule_stabilize(),
-    io:format("~w START~n",[Id]),
+    %io:format("~w START~n",[Id]),
     node(Id, Predecessor, Successor).
 
 %% Either we are the first node in a ring
@@ -31,7 +31,7 @@ connect(Id, Peer) ->
     Peer ! {key, Qref, self()},
     receive
         {Qref, Skey} ->
-            io:format("in a group with peer~n",[]),
+            io:format("in a group with peer~n"),
            {ok, {Skey, Peer}}
         after ?Timeout ->
             io:format("Time out: no response~n",[])
@@ -42,6 +42,7 @@ node(Id, Predecessor, Successor) ->
     receive
         % a peer wants to know our key
         {key, Qref, Peer} ->
+            io:format("new member!~n"),        
             Peer ! {Qref, Id},
             node(Id, Predecessor, Successor);
         % a new Node notifies us it may be our predecessor
@@ -57,14 +58,14 @@ node(Id, Predecessor, Successor) ->
             Succ = stabilize(Pred, Id, Successor),
             node(Id, Predecessor, Succ);
         probe ->
-            io:format("probe start!~n"),        
+            %io:format("probe start!~n"),        
             probe:create_probe(Id, Successor),
             node(Id, Predecessor, Successor);
         {probe, Id, Nodes, T} ->
             probe:remove_probe(T, Nodes),
             node(Id, Predecessor, Successor);
         {probe, Ref, Nodes, T} ->
-            io:format("probe forward!~n"),        
+            %io:format("probe forward!~n"),        
             probe:forward_probe(Ref, T, Nodes, Id, Successor),
             node(Id, Predecessor, Successor);  
         % time to stabilise
@@ -75,6 +76,7 @@ node(Id, Predecessor, Successor) ->
         % stops the process
         stop ->
             ok;
+        % print status
         status -> 
             io:format("~w status: ~w, ~w~n",[Id, Predecessor, Successor]),
             node(Id, Predecessor, Successor);    
@@ -103,7 +105,7 @@ stabilize(Pred, Id, Successor) ->
             case key:between(Xkey, Id, Skey) of
                 true ->     % the other node is between the node and the succesor
                     Xpid ! {notify, {Id, self()}},
-                    stabilize(Pred, Id, {Xkey, Xpid});
+                    {Xkey, Xpid};
                 false ->    % the current node is between Xpid and Spid
                     Spid ! {notify, {Id, self()}},
                     Successor
@@ -113,7 +115,7 @@ stabilize(Pred, Id, Successor) ->
 %% sets up a timer that triggers the stabilize()
 %% after a predenfined interval
 schedule_stabilize() ->
-    timer:send_interval(?Stabilize, self(), stabilize).
+   timer:send_interval(?Stabilize, self(), stabilize).
 
 %% handles the request from a Peer node
 %% by sending the status of its predecessor
@@ -130,18 +132,18 @@ request(Peer, Predecessor) ->
 notify({Nkey, Npid}, Id, Predecessor) ->
     case Predecessor of
         nil ->              % we have no predecessor
-            Npid ! {status, {Nkey, Npid}},
+            %Npid ! {status, {Nkey, Npid}},  % dont think this is needed....
             {Nkey, Npid};
         {Id, _} ->          % we are pointing to ourselves
-            Npid ! {status, {Nkey, Npid}},
+            %Npid ! {status, {Nkey, Npid}},
             {Nkey, Npid};
         {Pkey, _} ->        % we do have a predecessor
             case key:between(Nkey, Pkey, Id) of
                 true ->     % the new Node is between our predecessor and us
-                    Npid ! {status, {Nkey, Npid}},
+                    %Npid ! {status, {Nkey, Npid}},
                     {Nkey, Npid};
-                false ->    % the new Node is between our predecessor and us
-                    Npid ! {status, Predecessor},
+                false ->    % our predecessor is between the new Node and us
+                    %Npid ! {status, Predecessor},
                     Predecessor
             end
     end.

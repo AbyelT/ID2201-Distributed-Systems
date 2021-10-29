@@ -14,14 +14,13 @@ add(Key, Value, Store) ->
 lookup(Key, Store) ->
     case lists:keyfind(Key, 1, Store) of
         false -> false;
-        {_, Value} -> {Key, Value}
+        Found -> Found
     end.
 
 %% splits the store into one with keys inside the (From, To]
-%% outside
+%% and outside it
 split(From, To, Store) ->
-    {Updated, Rest} = lists:partition(fun({Key, _}) -> key:between(Key, From, To) end, Store),
-    {Updated, Rest}.
+    lists:partition(fun({Key, _}) -> key:between(Key, From, To) end, Store).
 
 %% merge two lists of key values 
 merge(Entries, Store) -> 

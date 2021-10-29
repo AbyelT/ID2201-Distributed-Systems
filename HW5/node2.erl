@@ -18,7 +18,7 @@ init(Id, Peer) ->
     Predecessor = nil,
     {ok, Successor} = connect(Id, Peer),
     schedule_stabilize(),
-    io:format("~w START~n",[Id]),
+    %io:format("~w START~n",[Id]),
     node(Id, Predecessor, Successor, storage:create()).
 
 %% Either we are the first node in a ring
@@ -44,7 +44,7 @@ node(Id, Predecessor, Successor, Store) ->
         {add, Key, Value, Qref, Client} ->
             Added = add(Key, Value, Qref, Client, Id, Predecessor, Successor, Store),
             node(Id, Predecessor, Successor, Added);
-        % lookup kay/value
+        % lookup key/value
         {lookup, Key, Qref, Client} ->
             lookup(Key, Qref, Client, Id, Predecessor, Successor, Store),
             node(Id, Predecessor, Successor, Store);
@@ -58,8 +58,8 @@ node(Id, Predecessor, Successor, Store) ->
             node(Id, Predecessor, Successor, Store);
         % a new Node notifies us it may be our predecessor
         {notify, New} ->
-            Pred = notify(New, Id, Predecessor, Store),
-            node(Id, Pred, Successor, Store);
+            {Pred, Store2} = notify(New, Id, Predecessor, Store),
+            node(Id, Pred, Successor, Store2);
         % a predecessor want to know our predecessor
         {request, Peer} ->
             request(Peer, Predecessor),
@@ -118,8 +118,9 @@ lookup(Key, Qref, Client, Id, {Pkey, _}, Successor, Store) ->
             Spid ! {lookup, Key, Qref, Client}
     end.
 
+%% stämmer detta?
 handover(Id, Store, Nkey, Npid) ->
-    {Keep, Rest} = storage:split(Id, Nkey, Store),
+    {Rest, Keep} = storage:split(Id, Nkey, Store), 
     Npid ! {handover, Rest},
     Keep.
         
@@ -142,7 +143,7 @@ stabilize(Pred, Id, Successor) ->
             case key:between(Xkey, Id, Skey) of
                 true ->     % the other node is between the node and the succesor
                     Xpid ! {notify, {Id, self()}},
-                    stabilize(Pred, Id, {Xkey, Xpid});
+                    {Xkey, Xpid};
                 false ->    % the current node is between Xpid and Spid
                     Spid ! {notify, {Id, self()}},
                     Successor
@@ -166,24 +167,27 @@ request(Peer, Predecessor) ->
 
 %% handles notify messages by checking if the
 %% new Node is our predecessor or not
+
+%% stämmer detta?
 notify({Nkey, Npid}, Id, Predecessor, Store) ->
     case Predecessor of
         nil ->              % we have no predecessor
             Keep = handover(Id, Store, Nkey, Npid),
-
-            Npid ! {status, {Nkey, Npid}},
-            {Nkey, Npid};
+            %Npid ! {status, {Nkey, Npid}},  %% is this needed anyone??
+            {{Nkey, Npid}, Keep};
         {Id, _} ->          % we are pointing to ourselves
-            Npid ! {status, {Nkey, Npid}},
-            {Nkey, Npid};
+            Keep = handover(Id, Store, Nkey, Npid),
+            %Npid ! {status, {Nkey, Npid}},
+            {{Nkey, Npid}, Keep};
         {Pkey, _} ->        % we do have a predecessor
             case key:between(Nkey, Pkey, Id) of
                 true ->     % the new Node is between our predecessor and us
-                    Npid ! {status, {Nkey, Npid}},
-                    {Nkey, Npid};
+                    Keep = handover(Id, Store, Nkey, Npid),
+                    %Npid ! {status, {Nkey, Npid}},
+                    {{Nkey, Npid}, Keep};
                 false ->    % the new Node is between our predecessor and us
-                    Npid ! {status, Predecessor},
-                    Predecessor
+                    %Npid ! {status, Predecessor},
+                    {Predecessor, Store}
             end
     end.
 
